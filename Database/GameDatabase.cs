@@ -95,10 +95,5 @@ namespace Database
         {
             MissingFiles.Clear();
         }
-
-        public static string[] GetMissingFiles()
-        {
-            return MissingFiles.ToArray();
-        }
     }
 }

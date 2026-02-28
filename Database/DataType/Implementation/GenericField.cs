@@ -17,9 +17,16 @@ namespace Database.DataType.Implementation
             var objectAddress = Marshal.ReadIntPtr(memoryAddress);
             if (objectAddress == IntPtr.Zero) return;
             var metaDataAddress = Marshal.ReadIntPtr(objectAddress + 12);
+            if (metaDataAddress == IntPtr.Zero) return;
             var name = new AsciiString();
             name.Deserialize(metaDataAddress + 16);
-            className = name.ToString().Split('.').Last();
+            var nameStr = name.ToString();
+            if (string.IsNullOrEmpty(nameStr))
+            {
+                content = new T();
+                return;
+            }
+            className = nameStr.Split('.').Last();
             var type = Type.GetType($"Database.Resource.Implementation.{this.className}");
             if (type is null)
             {

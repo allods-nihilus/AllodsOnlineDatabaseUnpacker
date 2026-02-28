@@ -9,7 +9,7 @@
     <AppDesignerFolder>Properties</AppDesignerFolder>
     <RootNamespace>AllodsOnlineDatabaseUnpacker</RootNamespace>
     <AssemblyName>AllodsOnlineDatabaseUnpacker</AssemblyName>
-    <TargetFrameworkVersion>v4.7.2</TargetFrameworkVersion>
+    <TargetFrameworkVersion>v4.8</TargetFrameworkVersion>
     <FileAlignment>512</FileAlignment>
   </PropertyGroup>
   <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Debug|AnyCPU' ">
@@ -69,13 +69,22 @@
       <SubType>Designer</SubType>
     </None>
     <None Include="packages.config" />
+    <None Include="App.config" />
   </ItemGroup>
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
-  <!-- To modify your build process, add your task inside one of the targets below and uncomment it. 
-         Other similar extension points exist, see Microsoft.Common.targets.
-    <Target Name="BeforeBuild">
-    </Target>
-    <Target Name="AfterBuild">
-    </Target>
-    -->
+  <PropertyGroup>
+    <RepoRoot>$([System.IO.Path]::GetFullPath('$(MSBuildProjectDirectory)\..\..\..'))</RepoRoot>
+  </PropertyGroup>
+  <Target Name="AfterBuild">
+    <!-- Copy data\Types from server files -->
+    <Exec Command="xcopy /E /I /Y &quot;$(RepoRoot)\allods\servers\1.1\game\data\Types&quot; &quot;$(OutputPath)data\Types&quot;" />
+    <!-- Copy data\System\index.bin -->
+    <MakeDir Directories="$(OutputPath)data\System" />
+    <Exec Command="xcopy /Y &quot;$(RepoRoot)\allods\servers\1.1\game\data\System\index.bin&quot; &quot;$(OutputPath)data\System\&quot;" />
+    <!-- Extract Bin.pak (zip) to data\Bin -->
+    <MakeDir Directories="$(OutputPath)data" />
+    <Exec Command="&quot;%SystemRoot%\System32\tar.exe&quot; -xf &quot;$(RepoRoot)\allods\clients\1.1\data\Packs\Bin.pak&quot; -C &quot;$(MSBuildProjectDirectory)\$(OutputPath)data&quot;" />
+    <!-- Copy Helper\Release_bin contents -->
+    <Exec Command="xcopy /E /I /Y &quot;$(RepoRoot)\reference\Helper\Release_bin&quot; &quot;$(OutputPath).&quot;" />
+  </Target>
 </Project>

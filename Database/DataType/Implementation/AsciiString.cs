@@ -27,11 +27,26 @@ namespace Database.DataType.Implementation
         {
             var startAddress = Marshal.ReadIntPtr(memoryAddress);
             var endAddress = Marshal.ReadIntPtr(memoryAddress + 4);
-            var sb = new StringBuilder();
-            for (var localPtr = startAddress; localPtr != endAddress; localPtr += 1)
+
+            if (startAddress == IntPtr.Zero || endAddress == IntPtr.Zero)
             {
-                var readByte = Marshal.ReadByte(localPtr);
-                if (readByte != 0) sb.Append(Convert.ToChar(readByte));
+                value = string.Empty;
+                return;
+            }
+
+            var length = endAddress.ToInt32() - startAddress.ToInt32();
+            if (length <= 0 || length > 4096)
+            {
+                value = string.Empty;
+                return;
+            }
+
+            var buffer = new byte[length];
+            Marshal.Copy(startAddress, buffer, 0, length);
+            var sb = new StringBuilder(length);
+            for (var i = 0; i < length; i++)
+            {
+                if (buffer[i] != 0) sb.Append((char) buffer[i]);
             }
 
             value = sb.ToString();

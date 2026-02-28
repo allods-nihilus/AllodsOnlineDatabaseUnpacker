@@ -1,5 +1,8 @@
 using System;
+using System.Collections.Generic;
 using System.IO;
+using System.Linq;
+using System.Runtime.ExceptionServices;
 using System.Text;
 using System.Xml;
 using Database;
@@ -17,6 +20,11 @@ namespace AllodsOnlineDatabaseUnpacker
         private static readonly Logger Logger = LogManager.GetCurrentClassLogger();
         private readonly string exportFolder;
         private readonly bool testMode;
+        private int successCount;
+        private int errorCount;
+        private int skippedMissing;
+        private int skippedUnimplemented;
+        private readonly Dictionary<string, int> unimplementedTypes = new Dictionary<string, int>();
 
         public Unpacker(bool testMode, string exportFolder)
         {
@@ -40,50 +48,82 @@ namespace AllodsOnlineDatabaseUnpacker
                 // GameDatabase.ResetMissingFiles();
                 Run(notIndexedDependencies);
             }
+            else
+            {
+                Logger.Info($"Unpacker finished: {successCount} extracted, {errorCount} errors, {skippedMissing} missing, {skippedUnimplemented} unimplemented");
+                if (unimplementedTypes.Count > 0)
+                {
+                    Logger.Info("Unimplemented types:");
+                    foreach (var kv in unimplementedTypes.OrderByDescending(x => x.Value))
+                        Logger.Info($"  {kv.Key}: {kv.Value} files");
+                }
+            }
         }
 
+        [HandleProcessCorruptedStateExceptions]
         private void BuildObject(string filePath)
         {
             if (!GameDatabase.DoesFileExists(filePath))
             {
-                return; // Some files are indexed but not present in pack.bin, just skipping them
+                skippedMissing++;
+                return;
             }
             var className = Utils.GetClassName(filePath);
             var type = Type.GetType($"Database.Resource.Implementation.{className}, Database");
             if (type is null)
             {
-                return; // Some types are not extracted because they are not implemented in the unpacker
+                skippedUnimplemented++;
+                if (!unimplementedTypes.ContainsKey(className))
+                    unimplementedTypes[className] = 0;
+                unimplementedTypes[className]++;
+                return;
             }
-            if (!(Activator.CreateInstance(type) is Resource obj))
-            {
-                throw new Exception($"Obj is null for {filePath}");
-            }
-            obj.Deserialize(GameDatabase.GetObjectPtr(filePath));
 
-            var directoryName = Path.GetDirectoryName(filePath);
-            if (directoryName is null)
+            try
             {
-                throw new Exception($"Directory name is null for path {filePath}");
-            }
-            directoryName = Path.Combine(exportFolder, directoryName);
-            if (!Directory.Exists(directoryName))
-            {
-                Directory.CreateDirectory(directoryName);
-            }
-            using (var writer = new XmlTextWriter(Path.Combine(exportFolder, filePath), new UTF8Encoding(false)))
-            {
-                writer.Formatting = Formatting.Indented;
-                writer.Indentation = 4;
-                if (testMode)
+                if (!(Activator.CreateInstance(type) is Resource obj))
                 {
-                    obj.Serialize(className);
+                    Logger.Error($"Failed to create instance for {filePath}");
+                    errorCount++;
+                    return;
                 }
-                else
+                obj.Deserialize(GameDatabase.GetObjectPtr(filePath));
+
+                var directoryName = Path.GetDirectoryName(filePath);
+                if (directoryName is null)
+                {
+                    Logger.Error($"Directory name is null for path {filePath}");
+                    errorCount++;
+                    return;
+                }
+                var fullDir = Path.GetFullPath(Path.Combine(exportFolder, directoryName));
+                var fullFile = Path.GetFullPath(Path.Combine(exportFolder, filePath));
+                // Use long path prefix to bypass MAX_PATH limit
+                if (!fullDir.StartsWith(@"\\?\")) fullDir = @"\\?\" + fullDir;
+                if (!fullFile.StartsWith(@"\\?\")) fullFile = @"\\?\" + fullFile;
+                if (!Directory.Exists(fullDir))
+                {
+                    Directory.CreateDirectory(fullDir);
+                }
+                using (var writer = new XmlTextWriter(fullFile, new UTF8Encoding(false)))
                 {
                     writer.Formatting = Formatting.Indented;
                     writer.Indentation = 4;
-                    obj.Serialize(className).Save(writer);
+                    if (testMode)
+                    {
+                        obj.Serialize(className);
+                    }
+                    else
+                    {
+                        obj.Serialize(className).Save(writer);
+                    }
                 }
+                successCount++;
+            }
+            catch (Exception e)
+            {
+                Logger.Error($"Error processing {filePath}: {e.Message}");
+                errorCount++;
             }
         }
     }

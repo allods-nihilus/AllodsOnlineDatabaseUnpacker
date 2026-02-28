@@ -1,6 +1,7 @@
 ﻿using System;
 using System.IO;
 using System.Reflection;
+using System.Runtime.ExceptionServices;
 using Database;
 using Database.Resource.Implementation;
 using Microsoft.Extensions.CommandLineUtils;
@@ -12,6 +13,7 @@ namespace AllodsOnlineDatabaseUnpacker
     {
         private static readonly Logger Logger = LogManager.GetCurrentClassLogger();
 
+        [HandleProcessCorruptedStateExceptions]
         public static void Main(string[] args)
         {
             var app = new CommandLineApplication();
@@ -94,8 +96,10 @@ namespace AllodsOnlineDatabaseUnpacker
             finally
             {
                 Console.WriteLine("Program finished, press any key to exit ...");
-                Console.ReadKey();
-                Environment.Exit(0);
+                if (Console.IsInputRedirected)
+                    Environment.Exit(0);
+                else
+                    Console.ReadKey();
             }
         }
     }

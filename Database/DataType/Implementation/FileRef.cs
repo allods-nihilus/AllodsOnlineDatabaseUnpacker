@@ -15,18 +15,22 @@ namespace Database.DataType.Implementation
         {
             if (href == IntPtr.Zero) return new XElement(name, new XAttribute("href", ""));
             var cursor = Marshal.ReadIntPtr(href + 12);
-            var readByte = Marshal.ReadByte(cursor);
+            if (cursor == IntPtr.Zero) return new XElement(name, new XAttribute("href", ""));
             var sb = new StringBuilder();
-            while (readByte != 0)
+            for (var i = 0; i < 4096; i++)
             {
+                var readByte = Marshal.ReadByte(cursor);
+                if (readByte == 0) break;
                 sb.Append(Convert.ToChar(readByte));
                 cursor += 1;
-                readByte = Marshal.ReadByte(cursor);
             }
 
             var fileName = sb.ToString();
+            if (string.IsNullOrEmpty(fileName))
+                return new XElement(name, new XAttribute("href", ""));
+
             var className = Utils.GetClassName(fileName);
-            
+
             if (!GameDatabase.DoesFileExists(fileName))
             {
                 Logger.Warn($"{fileName} is not indexed, it will be processed in next batch");

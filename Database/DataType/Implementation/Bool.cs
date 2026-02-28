@@ -18,17 +18,7 @@ namespace Database.DataType.Implementation
         public override void Deserialize(IntPtr memoryAddress)
         {
             var result = Marshal.ReadByte(memoryAddress);
-            switch (result)
-            {
-                case 0:
-                    value = false;
-                    break;
-                case 1:
-                    value = true;
-                    break;
-                default:
-                    throw new Exception($"Cannot cast {result} to bool");
-            }
+            value = result != 0;
         }
     }
 }
