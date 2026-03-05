@@ -35,5 +35,15 @@ namespace Database
         {
             return objectList;
         }
+
+        public static string GetClassTypeName(string filename)
+        {
+            return Wrapper.GetClassTypeNameByFile(databaseHandle, filename);
+        }
+
+        public static string GetClassesList()
+        {
+            return Wrapper.Database_GetClassesList(databaseHandle);
+        }
     }
 }
