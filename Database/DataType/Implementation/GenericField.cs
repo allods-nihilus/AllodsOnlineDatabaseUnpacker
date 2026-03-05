@@ -10,6 +10,7 @@ namespace Database.DataType.Implementation
     public class GenericField<T> : DataType where T : Resource.Resource, new()
     {
         private string className;
+        private string fullJavaName;
         private T content;
 
         public override void Deserialize(IntPtr memoryAddress)
@@ -26,6 +27,7 @@ namespace Database.DataType.Implementation
                 content = new T();
                 return;
             }
+            fullJavaName = nameStr;
             className = nameStr.Split('.').Last();
             var type = Type.GetType($"Database.Resource.Implementation.{this.className}");
             if (type is null)
@@ -48,7 +50,10 @@ namespace Database.DataType.Implementation
         {
             if (content is null) return new XElement(name);
             var element = content.Serialize(name);
-            element.SetAttributeValue("type", className);
+            var typeName = fullJavaName ?? className;
+            if (typeName != null && typeName.StartsWith("client."))
+                typeName = typeName.Split('.')[typeName.Split('.').Length - 1];
+            element.SetAttributeValue("type", typeName);
             return element;
         }
     }

@@ -5,7 +5,9 @@ using System.Linq;
 using System.Runtime.ExceptionServices;
 using System.Text;
 using System.Xml;
+using System.Xml.Linq;
 using Database;
+using Database.DataType.Implementation;
 using Database.Resource;
 using NLog;
 
@@ -25,6 +27,18 @@ namespace AllodsOnlineDatabaseUnpacker
         private int skippedMissing;
         private int skippedUnimplemented;
         private readonly Dictionary<string, int> unimplementedTypes = new Dictionary<string, int>();
+        private static readonly Dictionary<string, Type> TypeCache = new Dictionary<string, Type>(StringComparer.OrdinalIgnoreCase);
+
+        static Unpacker()
+        {
+            // Build case-insensitive type cache from all Resource implementations
+            var baseType = typeof(Resource);
+            foreach (var type in baseType.Assembly.GetTypes())
+            {
+                if (!type.IsAbstract && baseType.IsAssignableFrom(type))
+                    TypeCache[type.Name] = type;
+            }
+        }
 
         public Unpacker(bool testMode, string exportFolder)
         {
@@ -68,9 +82,8 @@ namespace AllodsOnlineDatabaseUnpacker
                 skippedMissing++;
                 return;
             }
-            var className = Utils.GetClassName(filePath);
-            var type = Type.GetType($"Database.Resource.Implementation.{className}, Database");
-            if (type is null)
+            var className = GameDatabase.GetResolvedClassName(filePath);
+            if (!TypeCache.TryGetValue(className, out var type))
             {
                 skippedUnimplemented++;
                 if (!unimplementedTypes.ContainsKey(className))
@@ -87,7 +100,16 @@ namespace AllodsOnlineDatabaseUnpacker
                     errorCount++;
                     return;
                 }
-                obj.Deserialize(GameDatabase.GetObjectPtr(filePath));
+                var objPtr = GameDatabase.GetObjectPtr(filePath);
+                obj.Deserialize(objPtr);
+
+                // Use full Java type name as root element if available
+                var rootName = GameDatabase.GetJavaTypeName(filePath)
+                            ?? GameDatabase.GetJavaTypeNameForClass(className)
+                            ?? className;
+                // client.* types use short class name as root element
+                if (rootName.StartsWith("client."))
+                    rootName = rootName.Split('.')[rootName.Split('.').Length - 1];
 
                 var directoryName = Path.GetDirectoryName(filePath);
                 if (directoryName is null)
@@ -109,13 +131,23 @@ namespace AllodsOnlineDatabaseUnpacker
                 {
                     writer.Formatting = Formatting.Indented;
                     writer.Indentation = 4;
-                    if (testMode)
+                    // Set TextFileRef context for relative path computation
+                    var gameDir = filePath.Replace('\\', '/');
+                    var lastSlash = gameDir.LastIndexOf('/');
+                    TextFileRef.SetCurrentFileDir(lastSlash >= 0 ? gameDir.Substring(0, lastSlash) : "");
+                    var xElement = obj.Serialize(rootName);
+
+                    // Add Header with resourceId as first child
+                    var resourceId = GameDatabase.GetResourceId(filePath);
+                    if (resourceId >= 0)
                     {
-                        obj.Serialize(className);
+                        xElement.AddFirst(new XElement("Header",
+                            new XElement("resourceId", resourceId)));
                     }
-                    else
+
+                    if (!testMode)
                     {
-                        obj.Serialize(className).Save(writer);
+                        xElement.Save(writer);
                     }
                 }
                 successCount++;

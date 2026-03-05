@@ -11,6 +11,16 @@ namespace Database.DataType.Implementation
     {
         private IntPtr href;
 
+        // Thread-static context set by Resource.Serialize before each field
+        [ThreadStatic] private static string _contextClassName;
+        [ThreadStatic] private static string _contextFieldName;
+
+        public static void SetSerializationContext(string className, string fieldName)
+        {
+            _contextClassName = className;
+            _contextFieldName = fieldName;
+        }
+
         public override XElement Serialize(string name)
         {
             if (href == IntPtr.Zero) return new XElement(name, new XAttribute("href", ""));
@@ -37,7 +47,36 @@ namespace Database.DataType.Implementation
                 GameDatabase.AddNotIndexedDependency(fileName);
             }
 
-            return new XElement(name, new XAttribute("href", $"/{fileName}#xpointer(/{className})"));
+            // Resolve xpointer name:
+            // - Files with (TypeName) in name: use short TypeName from filename
+            // - Files without: resolve via TypeNameIndex → vtable → field target type → fallback
+            string xpointerName;
+            if (fileName.Contains("("))
+            {
+                xpointerName = className;
+            }
+            else
+            {
+                xpointerName = GameDatabase.GetJavaTypeName(fileName)
+                            ?? GameDatabase.ResolveJavaTypeFromPtr(href);
+
+                // If still unresolved, use field-level type info from annotatedTypes.xml
+                if (xpointerName == null && _contextClassName != null && _contextFieldName != null)
+                {
+                    var targetType = GameDatabase.GetFieldTargetType(_contextClassName, _contextFieldName);
+                    if (targetType != null)
+                    {
+                        xpointerName = targetType;
+                        // Learn this vtable→type mapping for future lookups
+                        var targetSimple = targetType.Split('.')[targetType.Split('.').Length - 1].Replace("$", "_");
+                        GameDatabase.LearnVtable(href, targetSimple, targetType);
+                    }
+                }
+
+                xpointerName = xpointerName ?? className;
+            }
+
+            return new XElement(name, new XAttribute("href", $"/{fileName}#xpointer(/{xpointerName})"));
         }
 
         public override void Deserialize(IntPtr memoryAddress)

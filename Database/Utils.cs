@@ -5,7 +5,7 @@ namespace Database
 {
     public static class Utils
     {
-        private static readonly Regex ClassRegex = new Regex(@"\((.+)\)\.xdb");
+        private static readonly Regex ClassRegex = new Regex(@"\(([^)]+)\)\.xdb");
         private static readonly Regex ClassRegex2 = new Regex(@"\/([^\/]+)\.xdb");
 
         public static string GetClassName(string filePath)

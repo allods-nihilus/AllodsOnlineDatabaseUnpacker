@@ -1,13 +1,14 @@
 using System;
 using System.Reflection;
 using System.Xml.Linq;
+using Database.DataType.Implementation;
 using Database.Serialization.Memory;
 using Database.Serialization.XDB;
 using NLog;
 
 namespace Database.Resource
 {
-    public abstract class Resource : IMemoryDeserializable, IXdbSerializable
+    public class Resource : IMemoryDeserializable, IXdbSerializable
     {
         private static readonly Logger Logger = LogManager.GetCurrentClassLogger();
 
@@ -33,13 +34,15 @@ namespace Database.Resource
         public XElement Serialize(string name)
         {
             var root = new XElement(name);
-            foreach (var field in GetType().GetFields())
+            var fields = GetType().GetFields();
+            foreach (var field in fields)
             {
                 var e = field.GetCustomAttributes(typeof(XdbElementAttribute), false).GetEnumerator();
                 if (e.MoveNext() && e.Current is XdbElementAttribute xdbElementAttribute)
                 {
                     try
                     {
+                        FileRef.SetSerializationContext(GetType().Name, field.Name);
                         root.Add(xdbElementAttribute.SerializeField(field, this));
                     }
                     catch (Exception ex)

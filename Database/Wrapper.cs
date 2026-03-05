@@ -44,5 +44,11 @@ namespace Database
 
         [DllImport("libdb", EntryPoint = "CSharp_Database_GetClassTypeNameByFile")]
         internal static extern string GetClassTypeNameByFile(HandleRef jarg1, string jarg2);
+
+        [DllImport("libdb", EntryPoint = "CSharp_Database_GetResourceId")]
+        public static extern int GetResourceId(HandleRef database, HandleRef dbid);
+
+        [DllImport("libdb", EntryPoint = "CSharp_Database_GetResourceId")]
+        public static extern int GetResourceId(HandleRef dbid);
     }
 }
